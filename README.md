@@ -90,3 +90,14 @@ program ejemplo {
     }
 }
 ```
+
+---
+
+## Terminal
+A continuación, se muestran capturas de pantalla de la ejecución del programa en la terminal:
+
+### Captura 1
+![Ejecución en la Terminal 1](medios/terminal_1.png)
+
+### Captura 2
+![Ejecución en la Terminal 2](medios/terminal_2.png)
