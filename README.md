@@ -1,4 +1,4 @@
-# Trad_Leng_2
+# Compilador
 
 ## Descripción del Proyecto
 Este proyecto implementa un analizador léxico y sintáctico para un lenguaje de programación simple. El objetivo es procesar código fuente, identificar tokens válidos y verificar que la estructura del programa cumpla con las reglas gramaticales definidas.
