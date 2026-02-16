@@ -82,16 +82,20 @@ class Parser:
 
     # Método principal para iniciar el análisis sintáctico
     def parse(self):
+        ast = None  # Initialize the AST as None
         try:
             if self.current_token.type == 'PROGRAM':
                 ast = self.program_block()
             else:
                 ast = self.program_c_style()
-            print("\n--- Árbol Sintáctico Abstracto (AST) ---")
-            print(ast)
-            return ast
         except ParserError:
             pass
+
+        # Print the AST only if there are no errors
+        if not self.errors:
+            print("\n--- Árbol Sintáctico Abstracto (AST) ---")
+            print(ast)
+        return ast
 
     # Analizar un programa con la estructura "program { ... }"
     def program_block(self):
