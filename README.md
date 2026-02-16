@@ -90,8 +90,3 @@ program ejemplo {
     }
 }
 ```
-
----
-
-## Créditos
-Desarrollado como parte del curso de Traductores e Intérpretes II.
