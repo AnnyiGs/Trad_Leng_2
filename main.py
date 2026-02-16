@@ -47,6 +47,10 @@ def main():
         return
 
     # ---------------- Parser ----------------
+    print("[DEBUG] Tokens pasados al analizador sintáctico:")
+    for token in tokens:
+        print(f"  {token}")
+
     parser = Parser(tokens)
     print("[PARSER] Iniciando análisis sintáctico...")
     parser.parse()
