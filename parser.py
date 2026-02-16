@@ -1,5 +1,30 @@
 from collections import namedtuple
 
+# Nodo del árbol sintáctico abstracto
+class ASTNode:
+    def __init__(self, type, value=None, children=None):
+        self.type = type
+        self.value = value
+        self.children = children if children else []
+
+    def __repr__(self):
+        return self._to_string()
+
+    def _to_string(self, level=0):
+        indent = "  " * level
+        result = f"{indent}{self.type}: {self.value}\n"
+        for child in self.children:
+            if child is not None:  # Ensure child is not None
+                result += child._to_string(level + 1)
+        return result
+
+    def to_string(self, level=0):
+        indent = "  " * level
+        result = f"{indent}{self.type}: {self.value}\n"
+        for child in self.children:
+            result += child.to_string(level + 1)
+        return result
+
 class ParserError(Exception):
     def __init__(self, message, token):
         super().__init__(message)
@@ -57,48 +82,57 @@ class Parser:
     def parse(self):
         try:
             if self.current_token.type == 'PROGRAM':
-                self.program_block()
+                ast = self.program_block()
             else:
-                self.program_c_style()
+                ast = self.program_c_style()
+            print("\n--- Árbol Sintáctico Abstracto (AST) ---")
+            print(ast)
+            return ast
         except ParserError:
             pass
 
     def program_block(self):
         self.expect('PROGRAM')
+        program_name = self.current_token.value
         self.expect('ID')
         self.expect('LBRACE')
-        self.statements()
+        statements = self.statements()
         self.expect('RBRACE')
         self.expect('EOF')
+        return ASTNode("Program", program_name, statements)
 
     def program_c_style(self):
+        nodes = []
         while self.current_token.type != 'EOF':
             try:
-                self.function_or_declaration()
-            except ParserError as e:
-                self.errors.append(str(e))
-                self.advance()  # evita loop infinito
-
-    # ---------------- Bloque de sentencias ----------------
-    def statements(self):
-        while self.current_token.type not in ('RBRACE','EOF'):
-            try:
-                self.statement()
+                nodes.append(self.function_or_declaration())
             except ParserError as e:
                 self.errors.append(str(e))
                 self.advance()
+        return ASTNode("ProgramCStyle", children=nodes)
+
+    # ---------------- Bloque de sentencias ----------------
+    def statements(self):
+        nodes = []
+        while self.current_token.type not in ('RBRACE','EOF'):
+            try:
+                nodes.append(self.statement())
+            except ParserError as e:
+                self.errors.append(str(e))
+                self.advance()
+        return nodes
 
     def statement(self):
         if self.current_token.type == 'VAR':
-            self.variable_declaration()
+            return self.variable_declaration()
         elif self.current_token.type in ('INT','FLOAT','STRING'):
-            self.variable_declaration_cstyle()
+            return self.variable_declaration_cstyle()
         elif self.current_token.type == 'ID':
-            self.assignment_or_function_call()
+            return self.assignment_or_function_call()
         elif self.current_token.type == 'PRINT':
-            self.print_statement()
+            return self.print_statement()
         elif self.current_token.type == 'RETURN':
-            self.return_statement()
+            return self.return_statement()
         else:
             expected = "declaración o instrucción"
             found_friendly = self.friendly(self.current_token.type)
@@ -109,9 +143,11 @@ class Parser:
     # ---------------- Declaraciones ----------------
     def variable_declaration(self):
         self.expect('VAR')
+        var_name = self.current_token.value
         self.expect('ID')
         self.expect('COLON')
-        if self.current_token.type in ('INT','FLOAT','STRING'):
+        var_type = self.current_token.type
+        if var_type in ('INT', 'FLOAT', 'STRING'):
             self.advance()
         else:
             expected = "tipo (int, float, string)"
@@ -120,6 +156,7 @@ class Parser:
             self.errors.append(msg)
             raise ParserError(msg, self.current_token)
         self.expect('SEMI')
+        return ASTNode("VariableDeclaration", var_name, [ASTNode("Type", var_type)])
 
     def variable_declaration_cstyle(self):
         self.advance()  # tipo
@@ -167,14 +204,17 @@ class Parser:
 
     # ---------------- Asignación o llamada a función ----------------
     def assignment_or_function_call(self):
+        id_name = self.current_token.value
         self.advance()  # ID
         if self.current_token.type == 'ASSIGN':
             self.advance()
-            self.expression()
+            expr = self.expression()
             self.expect('SEMI')
+            return ASTNode("Assignment", id_name, [expr])
         elif self.current_token.type == 'LPAREN':
-            self.function_call()
+            args = self.function_call()
             self.expect('SEMI')
+            return ASTNode("FunctionCall", id_name, args)
         else:
             expected = "signo '=' o '('"
             found_friendly = self.friendly(self.current_token.type)
@@ -199,40 +239,55 @@ class Parser:
     # ---------------- Llamadas a funciones ----------------
     def function_call(self):
         self.expect('LPAREN')
-        self.argument_list()
+        args = self.argument_list()
         self.expect('RPAREN')
+        return args
 
     def argument_list(self):
+        args = []
         if self.current_token.type not in ('RPAREN',):
-            self.expression()
+            args.append(self.expression())
             while self.current_token.type == 'COMMA':
                 self.advance()
-                self.expression()
+                args.append(self.expression())
+        return args
 
     # ---------------- Expresiones ----------------
     def expression(self):
-        self.term()
-        while self.current_token.type == 'OP' and self.current_token.value in ('+','-'):
+        left = self.term()
+        while self.current_token.type == 'OP' and self.current_token.value in ('+', '-'):
+            op = self.current_token.value
             self.advance()
-            self.term()
+            right = self.term()
+            left = ASTNode("BinaryOp", op, [left, right])
+        return left
 
     def term(self):
-        self.factor()
-        while self.current_token.type == 'OP' and self.current_token.value in ('*','/'):
+        left = self.factor()
+        while self.current_token.type == 'OP' and self.current_token.value in ('*', '/'):
+            op = self.current_token.value
             self.advance()
-            self.factor()
+            right = self.factor()
+            left = ASTNode("BinaryOp", op, [left, right])
+        return left
 
     def factor(self):
         if self.current_token.type == 'ID':
+            id_name = self.current_token.value
             self.advance()
             if self.current_token.type == 'LPAREN':
-                self.function_call()
-        elif self.current_token.type in ('NUMBER','STRING'):
+                args = self.function_call()
+                return ASTNode("FunctionCall", id_name, args)
+            return ASTNode("Identifier", id_name)
+        elif self.current_token.type in ('NUMBER', 'STRING'):
+            value = self.current_token.value
             self.advance()
+            return ASTNode("Literal", value)
         elif self.current_token.type == 'LPAREN':
             self.advance()
-            self.expression()
+            expr = self.expression()
             self.expect('RPAREN')
+            return expr
         else:
             expected = "expresión"
             found_friendly = self.friendly(self.current_token.type)

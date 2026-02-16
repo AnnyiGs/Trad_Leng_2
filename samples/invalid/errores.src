@@ -1,0 +1,11 @@
+program PruebaErrores {
+    var numero: int
+    
+    var texto: strng;
+    
+    numero = 5 * (3 + 2;
+    texto = "Hola mundo
+    
+    print(numero);
+    print(texto;
+}

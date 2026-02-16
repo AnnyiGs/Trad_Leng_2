@@ -1,0 +1,27 @@
+program ejemplo {
+    var x: int;
+    var y: float;
+    var mensaje: string;
+
+    int suma(int a, int b) {
+        return a + b;
+    }
+
+    float division(float a, float b) {
+        if (b == 0) {
+            print "Error: División por cero";
+            return 0;
+        }
+        return a / b;
+    }
+
+    void main() {
+        x = 10;
+        y = 20.5;
+        mensaje = "Hola, mundo";
+
+        print mensaje;
+        print suma(x, 5);
+        print division(y, 0);
+    }
+}

@@ -1,0 +1,29 @@
+# Gramática utilizada en el analizador sintáctico (parser.py)
+
+## Tokens soportados:
+- `ID`: identificador
+- `OP`: operador
+- `SEMI`: punto y coma
+- `LPAREN`: paréntesis izquierdo `(`
+- `RPAREN`: paréntesis derecho `)`
+- `LBRACE`: llave izquierda `{`
+- `RBRACE`: llave derecha `}`
+- `COMMA`: coma `,`
+- `COLON`: dos puntos `:`
+- `ASSIGN`: signo de asignación `=`
+- `PROGRAM`: palabra reservada `program`
+- `VAR`: palabra reservada `var`
+- `INT`: tipo entero
+- `FLOAT`: tipo flotante
+- `STRING`: tipo cadena
+- `PRINT`: palabra reservada `print`
+- `RETURN`: palabra reservada `return`
+- `EOF`: fin de archivo
+
+## Descripción general:
+- El analizador espera que el código fuente siga una estructura definida por las reglas del lenguaje.
+- Utiliza métodos como `expect()` para verificar que los tokens aparezcan en el orden correcto.
+- Los errores se registran si los tokens no cumplen con las reglas esperadas.
+
+## Notas:
+- La gramática específica (como las reglas de producción) no está explícitamente definida en el código, pero se infiere a partir de los métodos y validaciones implementadas en la clase `Parser`.
