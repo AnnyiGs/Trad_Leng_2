@@ -9,20 +9,29 @@ class ParserError(Exception):
 # Clase para representar nodos del árbol sintáctico abstracto
 class ASTNode:
     def __init__(self, type, value=None, children=None):
-        self.type = type
-        self.value = value
-        self.children = children if children else []
+        self.type = type  # Tipo del nodo (e.g., 'Program', 'VariableDeclaration')
+        self.value = value  # Valor asociado al nodo (e.g., nombre de variable)
+        self.children = children if children else []  # Hijos del nodo
 
     def __repr__(self):
         return self._to_string()
 
     def _to_string(self, level=0):
-        indent = "  " * level
+        """
+        Genera una representación en forma de árbol con sangría.
+        """
+        indent = "  " * level  # Generar espacios para la sangría
         result = f"{indent}{self.type}: {self.value}\n"
         for child in self.children:
-            if child is not None:  # Asegurarse de que el hijo no sea None
-                result += child._to_string(level + 1)
+            if child is not None:
+                result += child._to_string(level + 1)  # Llamada recursiva para los hijos
         return result
+
+    def display(self):
+        """
+        Muestra el árbol en la consola con jerarquía.
+        """
+        print(self._to_string())
 
 # Clase principal del analizador sintáctico
 class Parser:
@@ -171,3 +180,55 @@ class Parser:
                 self.errors.append(str(e))
                 self.advance()  # Evitar bucles infinitos en caso de error
         return ASTNode("ProgramCStyle", children=nodes)
+
+    def function_or_declaration(self):
+        """
+        Analiza una declaración de función o una declaración de variable.
+        """
+        if self.current_token.type in ('INT', 'FLOAT', 'STRING'):
+            next_token = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
+            if next_token and next_token.type == 'ID':
+                next_next = self.tokens[self.pos + 2] if self.pos + 2 < len(self.tokens) else None
+                if next_next and next_next.type == 'LPAREN':
+                    return self.function_declaration()
+                else:
+                    return self.variable_declaration_cstyle()
+            else:
+                return self.variable_declaration_cstyle()
+        else:
+            raise ParserError("Se esperaba declaración o función", self.current_token)
+
+    def function_declaration(self):
+        """
+        Analiza una declaración de función.
+        """
+        self.advance()  # Tipo de retorno
+        func_name = self.current_token.value
+        self.expect('ID')
+        self.expect('LPAREN')
+        params = self.parameter_list()
+        self.expect('RPAREN')
+        self.expect('LBRACE')
+        body = self.statements()
+        self.expect('RBRACE')
+        return ASTNode("FunctionDeclaration", func_name, [ASTNode("Parameters", children=params), ASTNode("Body", children=body)])
+
+    def parameter_list(self):
+        """
+        Analiza una lista de parámetros de una función.
+        """
+        params = []
+        if self.current_token.type in ('INT', 'FLOAT', 'STRING'):
+            param_type = self.current_token.type
+            self.advance()
+            param_name = self.current_token.value
+            self.expect('ID')
+            params.append(ASTNode("Parameter", param_name, [ASTNode("Type", param_type)]))
+            while self.current_token.type == 'COMMA':
+                self.advance()
+                param_type = self.current_token.type
+                self.advance()
+                param_name = self.current_token.value
+                self.expect('ID')
+                params.append(ASTNode("Parameter", param_name, [ASTNode("Type", param_type)]))
+        return params
