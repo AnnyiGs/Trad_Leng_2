@@ -3,7 +3,7 @@ from lexer import Lexer, LexerError
 from parser import Parser
 
 def main():
-    print("Selecciona una opción:")
+    print("\n\nSelecciona una opción:")
     print("1. Ingresar la ruta de un archivo para analizar.")
     print("2. Ingresar el código directamente en la consola.")
 
@@ -19,7 +19,7 @@ def main():
             print("Verifica que la ruta sea correcta y que el archivo exista.")
             return
     elif opcion == "2":
-        print("Ingresa el código a analizar. Finaliza con una línea vacía:")
+        print("\nIngresa el código a analizar. Finaliza con una línea vacía:")
         lineas = []
         while True:
             linea = input()
@@ -28,43 +28,43 @@ def main():
             lineas.append(linea)
         codigo = "\n".join(lineas)
     else:
-        print("❌ Opción no válida.")
+        print("\n❌ Opción no válida.")
         return
 
     print("\n--- Proceso de análisis iniciado ---")
 
     # ---------------- Lexer ----------------
     lexer = Lexer()
-    print("[LEXER] Iniciando tokenización...")
+    print("\n[LEXER] Iniciando tokenización...")
     try:
         tokens = list(lexer.tokenize(codigo))
-        print("[LEXER] Tokenización completada con éxito.")
-        print("[LEXER] Tokens generados:")
+        print("\n[LEXER] Tokenización completada con éxito.")
+        print("\n[LEXER] Tokens generados:")
         for token in tokens:
             print(f"  {token}")
     except LexerError as e:
-        print(f"[ERROR LÉXICO]: {e}")
+        print(f"\n[ERROR LÉXICO]: {e}")
         return
 
     # ---------------- Parser ----------------
-    print("[DEBUG] Tokens pasados al analizador sintáctico:")
+    print("\n\n[DEBUG] Tokens pasados al analizador sintáctico:")
     for token in tokens:
         print(f"  {token}")
 
     parser = Parser(tokens)
-    print("[PARSER] Iniciando análisis sintáctico...")
+    print("\n[PARSER] Iniciando análisis sintáctico...")
     parser.parse()
 
     # ---------------- Resultados ----------------
     if parser.errors:
-        print("[PARSER] Se encontraron errores sintácticos:")
+        print("\n[PARSER] Se encontraron errores sintácticos:")
         for e in parser.errors:
             print(f"  - {e}")
-        print("❌ El archivo no es válido.")
+        print("\n❌ El archivo no es válido.")
     else:
-        print("✅ El archivo es válido.")
+        print("\n✅ El archivo es válido.")
 
-    print("--- Proceso de análisis finalizado ---")
+    print("\n--- Proceso de análisis finalizado ---\n")
 
 if __name__ == "__main__":
     main()
