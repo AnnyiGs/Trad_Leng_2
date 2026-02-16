@@ -91,10 +91,12 @@ class Parser:
         except ParserError:
             pass
 
-        # Print the AST only if there are no errors
-        if not self.errors:
+        # Print the AST only if it was successfully generated and there are no errors
+        if ast and not self.errors:
             print("\n--- Árbol Sintáctico Abstracto (AST) ---")
             print(ast)
+        elif not ast:
+            print("❌ No se pudo generar el Árbol Sintáctico Abstracto (AST).")
         return ast
 
     # Analizar un programa con la estructura "program { ... }"
@@ -155,3 +157,17 @@ class Parser:
             raise ParserError(msg, self.current_token)
         self.expect('SEMI')
         return ASTNode("VariableDeclaration", var_name, [ASTNode("Type", var_type)])
+
+    def program_c_style(self):
+        """
+        Método para analizar programas con estilo C, donde las funciones o declaraciones
+        no están contenidas dentro de un bloque principal.
+        """
+        nodes = []
+        while self.current_token.type != 'EOF':
+            try:
+                nodes.append(self.function_or_declaration())
+            except ParserError as e:
+                self.errors.append(str(e))
+                self.advance()  # Evitar bucles infinitos en caso de error
+        return ASTNode("ProgramCStyle", children=nodes)
