@@ -6,33 +6,6 @@ class ParserError(Exception):
         super().__init__(message)
         self.token = token
 
-# Clase para representar nodos del árbol sintáctico abstracto
-class ASTNode:
-    def __init__(self, type, value=None, children=None):
-        self.type = type  # Tipo del nodo (e.g., 'Program', 'VariableDeclaration')
-        self.value = value  # Valor asociado al nodo (e.g., nombre de variable)
-        self.children = children if children else []  # Hijos del nodo
-
-    def __repr__(self):
-        return self._to_string()
-
-    def _to_string(self, level=0):
-        """
-        Genera una representación en forma de árbol con sangría.
-        """
-        indent = "  " * level  # Generar espacios para la sangría
-        result = f"{indent}{self.type}: {self.value}\n"
-        for child in self.children:
-            if child is not None:
-                result += child._to_string(level + 1)  # Llamada recursiva para los hijos
-        return result
-
-    def display(self):
-        """
-        Muestra el árbol en la consola con jerarquía.
-        """
-        print(self._to_string())
-
 # Clase principal del analizador sintáctico
 class Parser:
     # Nombres amigables para los tokens, usados en mensajes de error
@@ -91,57 +64,103 @@ class Parser:
 
     # Método principal para iniciar el análisis sintáctico
     def parse(self):
-        ast = None  # Initialize the AST as None
         try:
             if self.current_token.type == 'PROGRAM':
-                ast = self.program_block()
+                self.program_block()
             else:
-                ast = self.program_c_style()
+                self.program_c_style()
         except ParserError:
             pass
 
-        # Print the AST only if it was successfully generated and there are no errors
-        if ast and not self.errors:
-            print("\n--- Árbol Sintáctico Abstracto (AST) ---")
-            print(ast)
-        elif not ast:
-            print("❌ No se pudo generar el Árbol Sintáctico Abstracto (AST).")
-        return ast
+        # Print errors if any
+        if self.errors:
+            print("[PARSER] Se encontraron errores sintácticos:")
+            for e in self.errors:
+                print(f"  - {e}")
+        else:
+            print("✅ El archivo es válido.")
 
     # Analizar un programa con la estructura "program { ... }"
     def program_block(self):
         self.expect('PROGRAM')
-        program_name = self.current_token.value
         self.expect('ID')
         self.expect('LBRACE')
-        statements = self.statements()
+        self.statements()
         self.expect('RBRACE')
         self.expect('EOF')
-        return ASTNode("Program", program_name, statements)
+
+    # Analizar un programa con estilo C
+    def program_c_style(self):
+        while self.current_token.type != 'EOF':
+            try:
+                self.function_or_declaration()
+            except ParserError as e:
+                self.errors.append(str(e))
+                self.advance()  # Evitar bucles infinitos en caso de error
+
+    # Analizar una declaración de función o una declaración de variable
+    def function_or_declaration(self):
+        if self.current_token.type in ('INT', 'FLOAT', 'STRING'):
+            next_token = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
+            if next_token and next_token.type == 'ID':
+                next_next = self.tokens[self.pos + 2] if self.pos + 2 < len(self.tokens) else None
+                if next_next and next_next.type == 'LPAREN':
+                    self.function_declaration()
+                else:
+                    self.variable_declaration()
+            else:
+                self.variable_declaration()
+        else:
+            raise ParserError("Se esperaba declaración o función", self.current_token)
+
+    # Analizar una declaración de variable
+    def variable_declaration(self):
+        self.advance()  # Tipo de la variable
+        self.expect('ID')
+        self.expect('SEMI')
+
+    # Analizar una declaración de función
+    def function_declaration(self):
+        self.advance()  # Tipo de retorno
+        self.expect('ID')
+        self.expect('LPAREN')
+        self.parameter_list()
+        self.expect('RPAREN')
+        self.expect('LBRACE')
+        self.statements()
+        self.expect('RBRACE')
+
+    # Analizar una lista de parámetros
+    def parameter_list(self):
+        if self.current_token.type in ('INT', 'FLOAT', 'STRING'):
+            self.advance()
+            self.expect('ID')
+            while self.current_token.type == 'COMMA':
+                self.advance()
+                self.advance()
+                self.expect('ID')
 
     # Analizar una lista de sentencias
     def statements(self):
-        nodes = []
         while self.current_token.type not in ('RBRACE', 'EOF'):
             try:
-                nodes.append(self.statement())
+                self.statement()
             except ParserError as e:
                 self.errors.append(str(e))
                 self.advance()
-        return nodes
 
     # Analizar una sentencia individual
     def statement(self):
         if self.current_token.type == 'VAR':
-            return self.variable_declaration()
+            self.variable_declaration()
         elif self.current_token.type in ('INT', 'FLOAT', 'STRING'):
-            return self.variable_declaration_cstyle()
+            self.variable_declaration()
         elif self.current_token.type == 'ID':
-            return self.assignment_or_function_call()
+            self.assignment_or_function_call()
         elif self.current_token.type == 'PRINT':
-            return self.print_statement()
+            self.print_statement()
         elif self.current_token.type == 'RETURN':
-            return self.return_statement()
+            self.return_statement()
         else:
             expected = "declaración o instrucción"
             found_friendly = self.friendly(self.current_token.type)
@@ -149,86 +168,66 @@ class Parser:
             self.errors.append(msg)
             raise ParserError(msg, self.current_token)
 
-    # Analizar una declaración de variable
-    def variable_declaration(self):
-        self.expect('VAR')
-        var_name = self.current_token.value
-        self.expect('ID')
-        self.expect('COLON')
-        var_type = self.current_token.type
-        if var_type in ('INT', 'FLOAT', 'STRING'):
+    # Analizar una asignación o llamada a función
+    def assignment_or_function_call(self):
+        self.advance()  # ID
+        if self.current_token.type == 'ASSIGN':
             self.advance()
+            self.expression()
+            self.expect('SEMI')
+        elif self.current_token.type == 'LPAREN':
+            self.function_call()
+            self.expect('SEMI')
         else:
-            expected = "tipo (int, float, string)"
+            expected = "signo '=' o '('"
+            found_friendly = self.friendly(self.current_token.type)
+            msg = f"[SINTÁCTICO] Se esperaba {expected} después de identificador pero se encontró {found_friendly} en línea {self.current_token.line}, columna {self.current_token.column}"
+            self.errors.append(msg)
+            raise ParserError(msg, self.current_token)
+
+    # Analizar una llamada a función
+    def function_call(self):
+        self.expect('LPAREN')
+        self.argument_list()
+        self.expect('RPAREN')
+
+    # Analizar una lista de argumentos
+    def argument_list(self):
+        if self.current_token.type not in ('RPAREN',):
+            self.expression()
+            while self.current_token.type == 'COMMA':
+                self.advance()
+                self.expression()
+
+    # Analizar una expresión
+    def expression(self):
+        self.term()
+        while self.current_token.type == 'OP' and self.current_token.value in ('+', '-'):
+            self.advance()
+            self.term()
+
+    # Analizar un término
+    def term(self):
+        self.factor()
+        while self.current_token.type == 'OP' and self.current_token.value in ('*', '/'):
+            self.advance()
+            self.factor()
+
+    # Analizar un factor
+    def factor(self):
+        if self.current_token.type == 'ID':
+            self.advance()
+            if self.current_token.type == 'LPAREN':
+                self.function_call()
+        elif self.current_token.type in ('NUMBER', 'STRING'):
+            self.advance()
+        elif self.current_token.type == 'LPAREN':
+            self.advance()
+            self.expression()
+            self.expect('RPAREN')
+        else:
+            expected = "expresión"
             found_friendly = self.friendly(self.current_token.type)
             msg = f"[SINTÁCTICO] Se esperaba {expected} pero se encontró {found_friendly} en línea {self.current_token.line}, columna {self.current_token.column}"
             self.errors.append(msg)
             raise ParserError(msg, self.current_token)
-        self.expect('SEMI')
-        return ASTNode("VariableDeclaration", var_name, [ASTNode("Type", var_type)])
-
-    def program_c_style(self):
-        """
-        Método para analizar programas con estilo C, donde las funciones o declaraciones
-        no están contenidas dentro de un bloque principal.
-        """
-        nodes = []
-        while self.current_token.type != 'EOF':
-            try:
-                nodes.append(self.function_or_declaration())
-            except ParserError as e:
-                self.errors.append(str(e))
-                self.advance()  # Evitar bucles infinitos en caso de error
-        return ASTNode("ProgramCStyle", children=nodes)
-
-    def function_or_declaration(self):
-        """
-        Analiza una declaración de función o una declaración de variable.
-        """
-        if self.current_token.type in ('INT', 'FLOAT', 'STRING'):
-            next_token = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
-            if next_token and next_token.type == 'ID':
-                next_next = self.tokens[self.pos + 2] if self.pos + 2 < len(self.tokens) else None
-                if next_next and next_next.type == 'LPAREN':
-                    return self.function_declaration()
-                else:
-                    return self.variable_declaration_cstyle()
-            else:
-                return self.variable_declaration_cstyle()
-        else:
-            raise ParserError("Se esperaba declaración o función", self.current_token)
-
-    def function_declaration(self):
-        """
-        Analiza una declaración de función.
-        """
-        self.advance()  # Tipo de retorno
-        func_name = self.current_token.value
-        self.expect('ID')
-        self.expect('LPAREN')
-        params = self.parameter_list()
-        self.expect('RPAREN')
-        self.expect('LBRACE')
-        body = self.statements()
-        self.expect('RBRACE')
-        return ASTNode("FunctionDeclaration", func_name, [ASTNode("Parameters", children=params), ASTNode("Body", children=body)])
-
-    def parameter_list(self):
-        """
-        Analiza una lista de parámetros de una función.
-        """
-        params = []
-        if self.current_token.type in ('INT', 'FLOAT', 'STRING'):
-            param_type = self.current_token.type
-            self.advance()
-            param_name = self.current_token.value
-            self.expect('ID')
-            params.append(ASTNode("Parameter", param_name, [ASTNode("Type", param_type)]))
-            while self.current_token.type == 'COMMA':
-                self.advance()
-                param_type = self.current_token.type
-                self.advance()
-                param_name = self.current_token.value
-                self.expect('ID')
-                params.append(ASTNode("Parameter", param_name, [ASTNode("Type", param_type)]))
-        return params
